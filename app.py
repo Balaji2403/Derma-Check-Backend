@@ -280,7 +280,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 
 # Allow only your Netlify frontend to access the API
-CORS(app, resources={r"/*": {"origins": "https://derma-check.netlify.app"}})
+CORS(app, resources={r"/*": {"origins": ["https://derma-check.netlify.app"]}})
 
 # Google Drive file ID of your model
 GOOGLE_DRIVE_FILE_ID = "1SvznIpebERCB2LjAFep7AzxhNlz98hof"
