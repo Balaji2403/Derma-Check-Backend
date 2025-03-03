@@ -126,21 +126,24 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "https://derma-check.netlify.app"}})
 
-# Google Drive file ID (replace with your actual ID)
-MODEL_FILE_ID = "https://drive.google.com/file/d/1KrAzcqKnZPBBfLkHEGoL2eJRCFh6vwYL/view?usp=sharing"
+# Google Drive file ID of the model
+MODEL_FILE_ID = "1KrAzcqKnZPBBfLkHEGoL2eJRCFh6vwYL"
 MODEL_PATH = "best_model.keras"
 
-# Function to download model if not found
+# Function to download model from Google Drive
 def download_model():
     if not os.path.exists(MODEL_PATH):
-        print("Downloading model...")
-        url = f"https://drive.google.com/uc?id={MODEL_FILE_ID}"
-        response = requests.get(url)
-        with open(MODEL_PATH, 'wb') as f:
-            f.write(response.content)
-        print("Model downloaded!")
+        print("Downloading model from Google Drive...")
+        url = f"https://drive.google.com/uc?export=download&id={MODEL_FILE_ID}"
+        response = requests.get(url, stream=True)
 
-# Ensure model is available
+        with open(MODEL_PATH, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+
+        print("Model download complete!")
+
+# Ensure model is downloaded before loading
 download_model()
 model = load_model(MODEL_PATH)
 
@@ -183,3 +186,4 @@ def upload_image():
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000)
+
