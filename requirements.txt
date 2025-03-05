@@ -1,6 +1,6 @@
-Flask
-Flask-Cors
-gdown
-tensorflow
+flask
+flask-cors
 numpy
-Pillow
+tensorflow
+pillow
+gunicorn
