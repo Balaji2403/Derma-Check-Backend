@@ -267,84 +267,169 @@
 #     app.run(host="0.0.0.0", port=5000)  # Production-ready
 
 
+# from flask import Flask, request, jsonify
+# import gdown
+# import os
+# import zipfile
+# import gc
+# from tensorflow.keras.models import model_from_json
+# from tensorflow.keras.preprocessing.image import img_to_array, load_img
+# import numpy as np
+# from flask_cors import CORS
+
+# app = Flask(__name__)
+
+# # Allow only your Netlify frontend to access the API
+# CORS(app, resources={r"/*": {"origins": ["https://derma-check.netlify.app"]}})
+
+# # Google Drive file ID of your model
+# GOOGLE_DRIVE_FILE_ID = "1SvznIpebERCB2LjAFep7AzxhNlz98hof"
+# MODEL_ZIP_PATH = "best_model.zip"
+# MODEL_DIR = "best_model"
+# MODEL_CONFIG = os.path.join(MODEL_DIR, "config.json")
+# MODEL_WEIGHTS = os.path.join(MODEL_DIR, "model.weights.h5")
+
+# # Function to download and extract model if not present
+# def download_model():
+#     if not os.path.exists(MODEL_DIR):
+#         print("🚀 Downloading model from Google Drive...")
+#         try:
+#             gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}", MODEL_ZIP_PATH, quiet=False)
+#             print("✅ Model download complete!")
+
+#             print("📂 Extracting model files...")
+#             with zipfile.ZipFile(MODEL_ZIP_PATH, 'r') as zip_ref:
+#                 zip_ref.extractall(MODEL_DIR)
+#             print("✅ Extraction complete!")
+
+#         except Exception as e:
+#             print(f"❌ Error downloading model: {e}")
+#             exit(1)
+
+# # Load the model efficiently
+# def load_keras_model():
+#     global model
+#     if "model" not in globals():
+#         gc.collect()  # Free memory
+#         print("🔄 Loading model into memory...")
+#         with open(MODEL_CONFIG, "r") as json_file:
+#             model_json = json_file.read()
+#         model = model_from_json(model_json)
+#         model.load_weights(MODEL_WEIGHTS)
+#         print("✅ Model successfully loaded!")
+#     return model
+
+# # Ensure model is downloaded and loaded at startup
+# download_model()
+# load_keras_model()
+
+# # Class names
+# class_names = ['Melanoma', 'Squamous cell carcinoma', 'Basal cell carcinoma', 'Actinic Keratosis',
+#                'Dermatofibroma', 'Pigmented Benign Keratosis', 'Seborrheic Keratosis', 'Vascular lesion']
+
+# malignant_classes = ['Melanoma', 'Squamous cell carcinoma', 'Basal cell carcinoma']
+# benign_classes = ['Actinic Keratosis', 'Dermatofibroma', 'Pigmented Benign Keratosis',
+#                   'Seborrheic Keratosis', 'Vascular lesion']
+
+# # Prediction function
+# def predict_image(image_path):
+#     model = load_keras_model()
+#     img = load_img(image_path, target_size=(224, 224))
+#     img_array = img_to_array(img) / 255.0
+#     img_array = np.expand_dims(img_array, axis=0)
+
+#     predictions = model.predict(img_array)
+#     predicted_class = class_names[np.argmax(predictions)]
+#     confidence = float(np.max(predictions))
+
+#     classification = "Malignant" if predicted_class in malignant_classes else "Benign"
+
+#     return {"class": predicted_class, "type": classification, "confidence": confidence}
+
+# @app.route('/predict', methods=['POST'])
+# def upload_image():
+#     if 'file' not in request.files:
+#         return jsonify({"error": "No file provided"}), 400
+
+#     file = request.files['file']
+#     file_path = "temp.jpg"
+#     file.save(file_path)
+
+#     try:
+#         result = predict_image(file_path)
+#     except Exception as e:
+#         print(f"❌ Prediction error: {e}")
+#         return jsonify({"error": "Prediction failed"}), 500
+#     finally:
+#         os.remove(file_path)
+
+#     return jsonify(result)
+
+# if __name__ == '__main__':
+#     app.run(host="0.0.0.0", port=5000)
+
+
 from flask import Flask, request, jsonify
-import gdown
-import os
-import zipfile
-import gc
-from tensorflow.keras.models import model_from_json
-from tensorflow.keras.preprocessing.image import img_to_array, load_img
 import numpy as np
+import tensorflow.lite as tflite
+import os
+from PIL import Image
 from flask_cors import CORS
+import gunicorn
 
 app = Flask(__name__)
+CORS(app)  # Allow requests from React frontend
 
-# Allow only your Netlify frontend to access the API
-CORS(app, resources={r"/*": {"origins": ["https://derma-check.netlify.app"]}})
+# Load the TensorFlow Lite model
+interpreter = tflite.Interpreter(model_path='skin-cancer.tflite')  # Adjusted for deployment
+interpreter.allocate_tensors()
 
-# Google Drive file ID of your model
-GOOGLE_DRIVE_FILE_ID = "1SvznIpebERCB2LjAFep7AzxhNlz98hof"
-MODEL_ZIP_PATH = "best_model.zip"
-MODEL_DIR = "best_model"
-MODEL_CONFIG = os.path.join(MODEL_DIR, "config.json")
-MODEL_WEIGHTS = os.path.join(MODEL_DIR, "model.weights.h5")
-
-# Function to download and extract model if not present
-def download_model():
-    if not os.path.exists(MODEL_DIR):
-        print("🚀 Downloading model from Google Drive...")
-        try:
-            gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}", MODEL_ZIP_PATH, quiet=False)
-            print("✅ Model download complete!")
-
-            print("📂 Extracting model files...")
-            with zipfile.ZipFile(MODEL_ZIP_PATH, 'r') as zip_ref:
-                zip_ref.extractall(MODEL_DIR)
-            print("✅ Extraction complete!")
-
-        except Exception as e:
-            print(f"❌ Error downloading model: {e}")
-            exit(1)
-
-# Load the model efficiently
-def load_keras_model():
-    global model
-    if "model" not in globals():
-        gc.collect()  # Free memory
-        print("🔄 Loading model into memory...")
-        with open(MODEL_CONFIG, "r") as json_file:
-            model_json = json_file.read()
-        model = model_from_json(model_json)
-        model.load_weights(MODEL_WEIGHTS)
-        print("✅ Model successfully loaded!")
-    return model
-
-# Ensure model is downloaded and loaded at startup
-download_model()
-load_keras_model()
+# Get input and output details
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+input_shape = input_details[0]['shape']
 
 # Class names
-class_names = ['Melanoma', 'Squamous cell carcinoma', 'Basal cell carcinoma', 'Actinic Keratosis',
+class_names = ['Melanoma', 'Squamous cell carcinoma', 'Basal cell carcinoma', 'Actinic Keratosis', 
                'Dermatofibroma', 'Pigmented Benign Keratosis', 'Seborrheic Keratosis', 'Vascular lesion']
 
+# Remedies
+remedies = {
+    'Melanoma': "1. Seek immediate medical attention.\n2. Treatment options include surgery, immunotherapy, and targeted therapy.",
+    'Squamous cell carcinoma': "1. Consult a dermatologist.\n2. Treatment includes surgical removal, radiation, or topical chemotherapy.",
+    'Basal cell carcinoma': "1. Usually treated with surgical excision.\n2. Mohs surgery or topical treatments like imiquimod may be used.",
+    'Actinic Keratosis': "1. Can be treated with cryotherapy or laser therapy.\n2. Regular monitoring is important.",
+    'Dermatofibroma': "1. Typically harmless but can be removed if bothersome.\n2. Consult a doctor for evaluation.",
+    'Pigmented Benign Keratosis': "1. No treatment needed unless discomfort arises.\n2. Cryotherapy or laser removal are options.",
+    'Seborrheic Keratosis': "1. Usually benign can be removed if necessary.\n2. Cryotherapy, electrocautery, or laser treatment can help.",
+    'Vascular lesion': "1. Often harmless but can be treated for cosmetic reasons.\n2. Laser therapy or sclerotherapy are common treatments."
+}
+
+# Classification categories
 malignant_classes = ['Melanoma', 'Squamous cell carcinoma', 'Basal cell carcinoma']
-benign_classes = ['Actinic Keratosis', 'Dermatofibroma', 'Pigmented Benign Keratosis',
-                  'Seborrheic Keratosis', 'Vascular lesion']
+benign_classes = ['Actinic Keratosis', 'Dermatofibroma', 'Pigmented Benign Keratosis', 'Seborrheic Keratosis', 'Vascular lesion']
 
-# Prediction function
+# Image preprocessing and prediction function
 def predict_image(image_path):
-    model = load_keras_model()
-    img = load_img(image_path, target_size=(224, 224))
-    img_array = img_to_array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+    img = Image.open(image_path).resize((224, 224))
+    img_array = np.array(img, dtype=np.float32) / 255.0  # Normalize
+    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
 
-    predictions = model.predict(img_array)
+    # Ensure data type matches model requirements
+    if input_details[0]['dtype'] == np.uint8:
+        img_array = (img_array * 255).astype(np.uint8)
+    
+    # Run inference
+    interpreter.set_tensor(input_details[0]['index'], img_array)
+    interpreter.invoke()
+    predictions = interpreter.get_tensor(output_details[0]['index'])
+    
     predicted_class = class_names[np.argmax(predictions)]
     confidence = float(np.max(predictions))
-
     classification = "Malignant" if predicted_class in malignant_classes else "Benign"
-
-    return {"class": predicted_class, "type": classification, "confidence": confidence}
+    remedy_text = remedies.get(predicted_class, "1. Consult a dermatologist for further evaluation.\n2. Follow recommended treatment options.")
+    
+    return {"class": predicted_class, "type": classification, "confidence": confidence, "remedy": remedy_text}
 
 @app.route('/predict', methods=['POST'])
 def upload_image():
@@ -355,15 +440,10 @@ def upload_image():
     file_path = "temp.jpg"
     file.save(file_path)
 
-    try:
-        result = predict_image(file_path)
-    except Exception as e:
-        print(f"❌ Prediction error: {e}")
-        return jsonify({"error": "Prediction failed"}), 500
-    finally:
-        os.remove(file_path)
+    result = predict_image(file_path)
+    os.remove(file_path)  # Clean up temp file
 
     return jsonify(result)
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host='0.0.0.0', port=10000)  # Adjusted for Render deployment
