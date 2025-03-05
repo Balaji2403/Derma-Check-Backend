@@ -373,15 +373,43 @@ from flask import Flask, request, jsonify
 import numpy as np
 import tensorflow.lite as tflite
 import os
+import requests
 from PIL import Image
 from flask_cors import CORS
-import gunicorn
 
 app = Flask(__name__)
 CORS(app)  # Allow requests from React frontend
 
+# Google Drive File ID (Extracted from your link)
+GDRIVE_FILE_ID = "1BhrB-IWiTc4MxIoZcNCPJow0PQOkAowc"
+
+# Model filename
+MODEL_FILENAME = "skin-cancer.tflite"
+
+# Function to download model from Google Drive
+def download_model():
+    model_path = os.path.join(os.getcwd(), MODEL_FILENAME)
+    
+    if not os.path.exists(model_path):  # Download only if not already present
+        print("Downloading model from Google Drive...")
+        gdrive_url = f"https://drive.google.com/uc?export=download&id={GDRIVE_FILE_ID}"
+        response = requests.get(gdrive_url, stream=True)
+
+        if response.status_code == 200:
+            with open(model_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=1024):
+                    f.write(chunk)
+            print("Model downloaded successfully.")
+        else:
+            print("Failed to download model. Check the file ID and permissions.")
+
+    return model_path
+
+# Ensure model is downloaded
+MODEL_PATH = download_model()
+
 # Load the TensorFlow Lite model
-interpreter = tflite.Interpreter(model_path='skin-cancer.tflite')  # Adjusted for deployment
+interpreter = tflite.Interpreter(model_path=MODEL_PATH)
 interpreter.allocate_tensors()
 
 # Get input and output details
@@ -446,4 +474,4 @@ def upload_image():
     return jsonify(result)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)  # Adjusted for Render deployment
+    app.run(host='0.0.0.0', port=10000, debug=True)
